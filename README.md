@@ -24,7 +24,7 @@ Sky-Spy is part of the OUI-SPY firmware ecosystem:
 - JSON output format for mesh-mapper.py real-time visualization
 - Extracts GPS coordinates, altitude, speed, heading from drone telemetry
 - Tracks operator/pilot location and drone identification
-- Multi-drone tracking (up to 8 simultaneous)
+- Multi-drone tracking
 
 Like all OUI-SPY firmware, Sky-Spy features audio alerts with a non-blocking buzzer implementation running on a dedicated FreeRTOS task.
 
@@ -68,7 +68,7 @@ The OUI-SPY board is a ready-to-use ESP32-S3 platform with:
   - Location data (GPS coordinates, altitude, speed, heading)
   - System data (operator location)
   - Operator ID
-- **Multi-Drone Tracking:** Simultaneously track up to 8 drones
+- **Multi-Drone Tracking:** Track multiple drones simultaneously across mesh-relayed detection nodes
 
 ### Audio Alerts (Non-Blocking)
 - **Detection Alert:** 3 quick high-pitched beeps (1000 Hz) on first detection
