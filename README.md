@@ -31,7 +31,7 @@ Like all OUI-SPY firmware, Sky-Spy features audio alerts with a non-blocking buz
 ## Hardware Requirements
 
 ### OUI-SPY Board (Recommended)
-**Get the official hardware:** [Tindie](https://www.tindie.com) | [colonelpanic.tech](https://colonelpanic.tech)
+**Get the official hardware:** [colonelpanic.tech](https://colonelpanic.tech)
 
 The OUI-SPY board is a ready-to-use ESP32-S3 platform with:
 - Integrated buzzer with PWM control
