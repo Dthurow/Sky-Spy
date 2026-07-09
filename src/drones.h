@@ -22,10 +22,14 @@ struct id_data {
 
 #define MAX_UAVS 32
 
-
+//either returns pointer to ID matching the mac, or the next empty spot in the list
 id_data* next_uav(uint8_t* mac);
 
-// return true if at least one drone has been detected within length milliseconds
-bool drones_detected(unsigned long current_milliseconds, int length);
+// return count of drones currently detected within length milliseconds
+int drones_detected(unsigned long current_milliseconds, int length);
+
+
+// return count of all drones
+int total_detected();
 
 #endif

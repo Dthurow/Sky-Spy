@@ -177,10 +177,7 @@ void output_info(const char *text)
 
   Serial.println(text);
 
-  #if defined(TFT_ENABLED)
-    display.info(text);
-  #endif
-
+  
 }
 
 void send_json_fast(const id_data *UAV) {
@@ -339,6 +336,10 @@ void printerTask(void *param) {
   for (;;) {
     if (xQueueReceive(printQueue, &UAV, portMAX_DELAY)) {
       send_json_fast(&UAV);
+      
+      #ifdef TFT_ENABLED
+      display.new_detection(&UAV);
+      #endif
       // Mesh functionality removed - only JSON output over USB serial
     }
   }
@@ -412,6 +413,11 @@ void loop() {
   // Status message every 60 seconds
   if ((current_millis - last_status) > 60000UL) {
     output_info("{\"status\":\"scanning\"}");
+
+      #ifdef TFT_ENABLED
+      display.idle_update(drones_detected(current_millis, 7000), total_detected());
+      #endif
+
     last_status = current_millis;
   }
   
@@ -430,10 +436,15 @@ void loop() {
     }
     
     // Check if drone has gone out of range (no detection for 7 seconds)
-    bool drone_still_detected = drones_detected(current_millis, 7000);
+    bool drone_still_detected = drones_detected(current_millis, 7000) > 0;
     
     if (!drone_still_detected) {
       output_info("Drone out of range - stopping heartbeat");
+      
+      #ifdef TFT_ENABLED
+      display.info("Drone out of range");
+      #endif
+      
       portENTER_CRITICAL(&buzzerMux);
       device_in_range = false;
       portEXIT_CRITICAL(&buzzerMux);

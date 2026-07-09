@@ -11,15 +11,31 @@ id_data* next_uav(uint8_t* mac) {
     if (uavs[i].mac[0] == 0)
       return &uavs[i];
   }
+  //TODO once filled uavs list, this always returns
+  // first in the list, but should let you continue to loop
+  // through the buffer
   return &uavs[0];
 }
 
-bool drones_detected(unsigned long current_milliseconds, int length)
+int drones_detected(unsigned long current_milliseconds, int length)
 {
+    int cnt = 0;
     for (int i = 0; i < MAX_UAVS; i++) {
-      if (uavs[i].mac[0] != 0 && (current_milliseconds - uavs[i].last_seen) < length) {
-        return true;
+        if (uavs[i].mac[0] == 0){
+            break; //end of the list
       }
+      if (current_milliseconds - uavs[i].last_seen < length) {
+        cnt++;
+      }
+      
     }
-    return false;
+    return cnt;
+}
+
+int total_detected(){
+    for (int i = 0; i < MAX_UAVS; i++) {
+    if (uavs[i].mac[0] == 0)
+      return i;
+    }
+    return MAX_UAVS;
 }
