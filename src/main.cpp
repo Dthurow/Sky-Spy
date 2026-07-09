@@ -16,12 +16,20 @@
 #include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include "drones.h"
+
+#if defined(TFT_ENABLED)
+#include "display.h"
+
+DisplayHandler display = DisplayHandler();
+
+#endif
 
 // Buzzer configuration
-#define BUZZER_PIN 3  // GPIO3 (D2) - PWM capable pin on Xiao ESP32 S3
+#define BUZZER_PIN 5  // GPIO3 (D2) - PWM capable pin on Xiao ESP32 S3
 
 // LED configuration
-#define LED_PIN 21    // GPIO21 - Built-in orange LED on Xiao ESP32 S3 (inverted logic)
+#define LED_PIN LED_BUILTIN    // GPIO21 - Built-in orange LED on Xiao ESP32 S3 (inverted logic)
 
 // Audio Configuration
 #define DETECT_FREQ 1000  // Detection alert - high pitch (faster beeps)
@@ -29,29 +37,13 @@
 #define DETECT_BEEP_DURATION 150 // Detection beep duration (faster)
 #define HEARTBEAT_DURATION 100   // Short heartbeat pulse
 
-struct id_data {
-  uint8_t  mac[6];
-  int      rssi;
-  uint32_t last_seen;
-  char     op_id[ODID_ID_SIZE + 1];
-  char     uav_id[ODID_ID_SIZE + 1];
-  double   lat_d;
-  double   long_d;
-  double   base_lat_d;
-  double   base_long_d;
-  int      altitude_msl;
-  int      height_agl;
-  int      speed;
-  int      heading;
-  int      flag;
-};
 
 void callback(void *, wifi_promiscuous_pkt_type_t);
 void send_json_fast(const id_data *UAV);
+void output_info(const char *text);
 void buzzerTask(void *parameter);
 
-#define MAX_UAVS 32
-id_data uavs[MAX_UAVS] = {0};
+
 BLEScan* pBLEScan = nullptr;
 ODID_UAS_Data UAS_data;
 unsigned long last_status = 0;
@@ -65,17 +57,7 @@ static portMUX_TYPE buzzerMux = portMUX_INITIALIZER_UNLOCKED;
 
 static QueueHandle_t printQueue;
 
-id_data* next_uav(uint8_t* mac) {
-  for (int i = 0; i < MAX_UAVS; i++) {
-    if (memcmp(uavs[i].mac, mac, 6) == 0)
-      return &uavs[i];
-  }
-  for (int i = 0; i < MAX_UAVS; i++) {
-    if (uavs[i].mac[0] == 0)
-      return &uavs[i];
-  }
-  return &uavs[0];
-}
+
 
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 public:
@@ -173,7 +155,7 @@ void buzzerTask(void *parameter) {
     portEXIT_CRITICAL(&buzzerMux);
     
     if (do_heartbeat) {
-      Serial.println("Heartbeat: Drone still in range");
+      output_info("Heartbeat: Drone still in range");
       tone(BUZZER_PIN, HEARTBEAT_FREQ, HEARTBEAT_DURATION);
       digitalWrite(LED_PIN, LOW);  // Turn on LED (inverted logic)
       vTaskDelay(pdMS_TO_TICKS(100));
@@ -190,6 +172,17 @@ void buzzerTask(void *parameter) {
   }
 }
 
+void output_info(const char *text)
+{
+
+  Serial.println(text);
+
+  #if defined(TFT_ENABLED)
+    display.info(text);
+  #endif
+
+}
+
 void send_json_fast(const id_data *UAV) {
   char mac_str[18];
   snprintf(mac_str, sizeof(mac_str), "%02x:%02x:%02x:%02x:%02x:%02x",
@@ -200,7 +193,7 @@ void send_json_fast(const id_data *UAV) {
     "{\"mac\":\"%s\",\"rssi\":%d,\"drone_lat\":%.6f,\"drone_long\":%.6f,\"drone_altitude\":%d,\"pilot_lat\":%.6f,\"pilot_long\":%.6f,\"basic_id\":\"%s\"}",
     mac_str, UAV->rssi, UAV->lat_d, UAV->long_d, UAV->altitude_msl,
     UAV->base_lat_d, UAV->base_long_d, UAV->uav_id);
-  Serial.println(json_msg);
+  output_info(json_msg);
 }
 
 // Mesh functionality removed - this is now a pure USB serial drone scanner
@@ -368,11 +361,15 @@ void initializeLED() {
   Serial.println("Orange LED initialized on GPIO21 (inverted logic)");
 }
 
+
 void setup() {
   setCpuFrequencyMhz(160);
   initializeSerial();
   initializeBuzzer();
   initializeLED();
+  #if defined(TFT_ENABLED)
+  display.init();
+  #endif
   
   // Boot beep and LED flash to confirm device is ready
   tone(BUZZER_PIN, 800, 200);
@@ -406,7 +403,7 @@ void setup() {
   xTaskCreatePinnedToCore(printerTask, "PrinterTask", 10000, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(buzzerTask, "BuzzerTask", 4096, NULL, 1, NULL, 1);
   
-  memset(uavs, 0, sizeof(uavs));
+
 }
 
 void loop() {
@@ -414,7 +411,7 @@ void loop() {
   
   // Status message every 60 seconds
   if ((current_millis - last_status) > 60000UL) {
-    Serial.println("{\"status\":\"scanning\"}");
+    output_info("{\"status\":\"scanning\"}");
     last_status = current_millis;
   }
   
@@ -433,16 +430,10 @@ void loop() {
     }
     
     // Check if drone has gone out of range (no detection for 7 seconds)
-    bool drone_still_detected = false;
-    for (int i = 0; i < MAX_UAVS; i++) {
-      if (uavs[i].mac[0] != 0 && (current_millis - uavs[i].last_seen) < 7000) {
-        drone_still_detected = true;
-        break;
-      }
-    }
+    bool drone_still_detected = drones_detected(current_millis, 7000);
     
     if (!drone_still_detected) {
-      Serial.println("Drone out of range - stopping heartbeat");
+      output_info("Drone out of range - stopping heartbeat");
       portENTER_CRITICAL(&buzzerMux);
       device_in_range = false;
       portEXIT_CRITICAL(&buzzerMux);
