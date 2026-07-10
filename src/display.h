@@ -21,8 +21,10 @@ class DisplayHandler {
 
         void service();
 
-    protected:
         void power_saver(bool enable);
+
+    protected:
+        
         void scrolling_text(const char * text);
 
     private:

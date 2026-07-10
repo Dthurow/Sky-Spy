@@ -118,9 +118,7 @@ void DisplayHandler::info(const char * text)
 void DisplayHandler::idle_update(int cur_detections, int total_detections)
 {
     unsigned long curtime = millis();
-    if (curtime - last_updated < min_display){
-        return;
-    }
+
     
     tft.setTextWrap(true);
     tft.fillScreen(ST77XX_BLACK);
@@ -151,7 +149,7 @@ void DisplayHandler::detection(const id_data *UAV)
 
     char msg[256];
     snprintf(msg, sizeof(msg),
-        "mac:%s\nrssi:%d\nGPS:%.6f,%.6f\nalt:%d",
+        "mac:\n  %s\nrssi:%d\nGPS:\n  %.6f,%.6f\naltitude:%dm",
         mac_str, UAV->rssi, UAV->lat_d, UAV->long_d, UAV->altitude_msl
         );
 

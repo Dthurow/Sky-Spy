@@ -57,6 +57,9 @@ static portMUX_TYPE buzzerMux = portMUX_INITIALIZER_UNLOCKED;
 
 static QueueHandle_t printQueue;
 
+#ifdef BUTTONS_ENABLED
+static QueueHandle_t ActionQueue;
+#endif
 
 
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
@@ -345,6 +348,124 @@ void printerTask(void *param) {
   }
 }
 
+#ifdef BUTTONS_ENABLED
+typedef enum interactiontype {
+    INTERACTION_PAGE_UP = 0,
+    INTERACTION_PAGE_DOWN = 1,
+    INTERACTION_POWER = 2
+} interaction_t;
+
+
+void ARDUINO_ISR_ATTR buttonUpISR() 
+{
+  interaction_t tmp = INTERACTION_PAGE_UP;
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  xQueueSendFromISR(ActionQueue, &tmp, &xHigherPriorityTaskWoken);
+  if (xHigherPriorityTaskWoken) portYIELD_FROM_ISR();
+}
+
+void ARDUINO_ISR_ATTR buttonDownISR() 
+{
+
+  interaction_t tmp = INTERACTION_PAGE_DOWN;
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  xQueueSendFromISR(ActionQueue, &tmp, &xHigherPriorityTaskWoken);
+  if (xHigherPriorityTaskWoken) portYIELD_FROM_ISR();
+
+
+}
+
+void ARDUINO_ISR_ATTR buttonPowerISR() 
+{
+
+  interaction_t tmp = INTERACTION_POWER;
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  xQueueSendFromISR(ActionQueue, &tmp, &xHigherPriorityTaskWoken);
+  if (xHigherPriorityTaskWoken) portYIELD_FROM_ISR();
+
+
+}
+
+void interactionTask(void *param) {
+  interaction_t curAction;
+  interaction_t lastAction;
+  unsigned long last_interaction = millis();
+  id_data* current_displayed_drone = nullptr;
+  bool power_saver_enabled = false;
+
+  for (;;) {
+    if (xQueueReceive(ActionQueue, &curAction, portMAX_DELAY)) {
+      
+      if (curAction == lastAction && millis() - last_interaction < 75){
+        //false alarm, ignore
+        continue;
+      }
+      //Serial.printf("current pointer is %p ", current_displayed_drone);
+      switch (curAction){
+        case INTERACTION_PAGE_UP:
+        {
+          //either loop through drone detections or go back to home page
+          id_data * new_drone = find_prev_active_drone(millis(), ACTIVE_DRONE_TIMEFRAME, current_displayed_drone);
+          //Serial.printf("new pointer is %p going up\n", new_drone);
+          if (new_drone != nullptr)
+          {
+            
+            display.detection(new_drone);
+            
+          }
+          else{
+            display.idle_update(drones_detected(millis(), ACTIVE_DRONE_TIMEFRAME), total_detected());
+          }
+          current_displayed_drone = new_drone;
+
+          break;
+        }
+        case INTERACTION_PAGE_DOWN:
+        {
+          //either loop through drone detections or go back to home page
+          id_data * new_drone = find_next_active_drone(millis(), ACTIVE_DRONE_TIMEFRAME, current_displayed_drone);
+          //Serial.printf("new pointer is %p going down\n", new_drone);
+          if (new_drone != nullptr)
+          {
+            
+            display.detection(new_drone);
+            
+          }
+          else{
+            
+            display.idle_update(drones_detected(millis(), ACTIVE_DRONE_TIMEFRAME), total_detected());
+          }
+          current_displayed_drone = new_drone;
+          
+          break;
+        }
+        case INTERACTION_POWER:
+        {
+          //toggle display to power save mode or back on
+          
+          display.power_saver(!power_saver_enabled);
+          power_saver_enabled = !power_saver_enabled;
+
+          if (!power_saver_enabled)
+          {
+            // when powered back on, default to idle screen
+            //and erase last displayed drone info
+            display.idle_update(drones_detected(millis(), ACTIVE_DRONE_TIMEFRAME), total_detected());
+            current_displayed_drone = nullptr;
+
+          }
+          
+          break;
+        }
+      }
+
+      last_interaction = millis();
+      lastAction = curAction;
+    }
+  }
+}
+#endif
+
 void initializeSerial() {
   Serial.begin(115200);
   // Serial1 removed - no mesh functionality
@@ -362,6 +483,18 @@ void initializeLED() {
   Serial.println("Orange LED initialized on GPIO21 (inverted logic)");
 }
 
+#ifdef BUTTONS_ENABLED
+void initializeButtons(){
+  pinMode(0, INPUT_PULLUP);
+  pinMode(1, INPUT_PULLDOWN);
+  pinMode(2, INPUT_PULLDOWN);
+
+  attachInterrupt(1, buttonUpISR, RISING);
+  attachInterrupt(2, buttonDownISR, RISING);
+  attachInterrupt(0, buttonPowerISR, FALLING);
+}
+#endif
+
 
 void setup() {
   setCpuFrequencyMhz(160);
@@ -374,7 +507,10 @@ void setup() {
   //disable NEOPIXEL_POWER
   pinMode(NEOPIXEL_POWER, OUTPUT);
   digitalWrite(NEOPIXEL_POWER, LOW);
+  #endif
 
+  #ifdef BUTTONS_ENABLED
+  initializeButtons();
   #endif
   
   // Boot beep and LED flash to confirm device is ready
@@ -403,12 +539,20 @@ void setup() {
   pBLEScan->setActiveScan(true);
 
   printQueue = xQueueCreate(MAX_UAVS, sizeof(id_data));
-  
+  #ifdef BUTTONS_ENABLED
+  ActionQueue = xQueueCreate(10, sizeof(interaction_t));
+  #endif
+  #ifdef TFT_ENABLED
+  display.idle_update(drones_detected(millis(), ACTIVE_DRONE_TIMEFRAME), total_detected());
+  #endif
+
   xTaskCreatePinnedToCore(bleScanTask, "BLEScanTask", 10000, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(wifiProcessTask, "WiFiProcessTask", 10000, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(printerTask, "PrinterTask", 10000, NULL, 1, NULL, 1);
   xTaskCreatePinnedToCore(buzzerTask, "BuzzerTask", 4096, NULL, 1, NULL, 1);
-  
+  #ifdef BUTTONS_ENABLED
+  xTaskCreatePinnedToCore(interactionTask, "InteractionTask", 10000, NULL, 1, NULL, 1);
+  #endif
 
 }
 
@@ -420,7 +564,7 @@ void loop() {
     output_info("{\"status\":\"scanning\"}");
 
       #ifdef TFT_ENABLED
-      display.idle_update(drones_detected(current_millis, 7000), total_detected());
+      display.idle_update(drones_detected(current_millis, ACTIVE_DRONE_TIMEFRAME), total_detected());
       #endif
 
     last_status = current_millis;
@@ -440,8 +584,8 @@ void loop() {
       last_heartbeat = current_millis;
     }
     
-    // Check if drone has gone out of range (no detection for 7 seconds)
-    bool drone_still_detected = drones_detected(current_millis, 7000) > 0;
+    // Check if drone has gone out of range 
+    bool drone_still_detected = drones_detected(current_millis, ACTIVE_DRONE_TIMEFRAME) > 0;
     
     if (!drone_still_detected) {
       output_info("Drone out of range - stopping heartbeat");
