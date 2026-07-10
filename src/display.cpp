@@ -11,13 +11,14 @@ DisplayHandler::DisplayHandler(){};
 
 void DisplayHandler::init()
 {
+    power_save_en = false;
+    pinMode(TFT_BACKLITE, OUTPUT);
+    pinMode(TFT_I2C_POWER, OUTPUT);
 
     // turn on backlite
-    pinMode(TFT_BACKLITE, OUTPUT);
     digitalWrite(TFT_BACKLITE, HIGH);
 
     // turn on the TFT / I2C power supply
-    pinMode(TFT_I2C_POWER, OUTPUT);
     digitalWrite(TFT_I2C_POWER, HIGH);
     delay(10);
 
@@ -30,14 +31,27 @@ void DisplayHandler::init()
     tft.setTextSize(3);
     tft.setCursor(0,0);
 
-    const char * text = "Initialized\n will scan for remoteID drones within roughly 500 feet";
+    tft.println("Initializing");
+
+
+}
+
+void DisplayHandler::scrolling_text(const char * text)
+{
+    tft.fillScreen(ST77XX_BLACK);
+    tft.setTextColor(ST77XX_GREEN);
+    tft.setTextSize(3);
+    tft.setCursor(0,0);
     const char * line = text;
     const char * top_of_screen = text;
+    //max width/height calculated based on text size
+    // and screen size
     int maxchars_width = tft.width() / (18);
     int maxchars_height = tft.height() / 24;
 
     int curlines = 0;
     int loopcnt = 0;
+    //max print out 100 lines
     while (loopcnt < 100){
         
         if (curlines >= maxchars_height){
@@ -62,9 +76,29 @@ void DisplayHandler::init()
         
         loopcnt++;
     }
-
+    last_updated = millis();
 }
 
+void DisplayHandler::power_saver(bool enable){
+    if (!power_save_en && enable){
+         // turn off backlite
+        digitalWrite(TFT_BACKLITE, LOW);
+
+        // turn off the TFT / I2C power supply
+        digitalWrite(TFT_I2C_POWER, LOW);
+        delay(10);
+    }
+    else if (power_save_en && !enable){
+         // turn on backlite
+        digitalWrite(TFT_BACKLITE, HIGH);
+
+        // turn on the TFT / I2C power supply
+        digitalWrite(TFT_I2C_POWER, HIGH);
+        delay(10);
+        
+    }
+    power_save_en = enable;
+}
 
 void DisplayHandler::info(const char * text)
 {
@@ -87,6 +121,7 @@ void DisplayHandler::idle_update(int cur_detections, int total_detections)
     if (curtime - last_updated < min_display){
         return;
     }
+    
     tft.setTextWrap(true);
     tft.fillScreen(ST77XX_BLACK);
     tft.setTextColor(ST77XX_GREEN);
@@ -94,9 +129,14 @@ void DisplayHandler::idle_update(int cur_detections, int total_detections)
     tft.setCursor(0, 0);
     tft.printf("In Range: %d\nTotal: %d\nScanning...", cur_detections, total_detections);
     last_updated = curtime;
+    last_active_detection_cnt = cur_detections;
+    last_total_cnt = total_detections;
+
+
+    
 }
 
-void DisplayHandler::new_detection(const id_data *UAV)
+void DisplayHandler::detection(const id_data *UAV)
 {
     tft.fillScreen(ST77XX_BLACK);
     tft.setTextColor(ST77XX_RED);

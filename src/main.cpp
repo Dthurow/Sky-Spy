@@ -338,7 +338,7 @@ void printerTask(void *param) {
       send_json_fast(&UAV);
       
       #ifdef TFT_ENABLED
-      display.new_detection(&UAV);
+      display.detection(&UAV);
       #endif
       // Mesh functionality removed - only JSON output over USB serial
     }
@@ -370,6 +370,11 @@ void setup() {
   initializeLED();
   #if defined(TFT_ENABLED)
   display.init();
+
+  //disable NEOPIXEL_POWER
+  pinMode(NEOPIXEL_POWER, OUTPUT);
+  digitalWrite(NEOPIXEL_POWER, LOW);
+
   #endif
   
   // Boot beep and LED flash to confirm device is ready
