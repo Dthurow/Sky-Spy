@@ -352,7 +352,7 @@ void printerTask(void *param) {
 typedef enum interactiontype {
     INTERACTION_PAGE_UP = 0,
     INTERACTION_PAGE_DOWN = 1,
-    INTERACTION_POWER = 2
+    INTERACTION_OTHER = 2
 } interaction_t;
 
 
@@ -375,10 +375,10 @@ void ARDUINO_ISR_ATTR buttonDownISR()
 
 }
 
-void ARDUINO_ISR_ATTR buttonPowerISR() 
+void ARDUINO_ISR_ATTR buttonOtherISR() 
 {
 
-  interaction_t tmp = INTERACTION_POWER;
+  interaction_t tmp = INTERACTION_OTHER;
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   xQueueSendFromISR(ActionQueue, &tmp, &xHigherPriorityTaskWoken);
   if (xHigherPriorityTaskWoken) portYIELD_FROM_ISR();
@@ -439,23 +439,18 @@ void interactionTask(void *param) {
           
           break;
         }
-        case INTERACTION_POWER:
+        case INTERACTION_OTHER:
         {
-          //toggle display to power save mode or back on
-          
-          display.power_saver(!power_saver_enabled);
-          power_saver_enabled = !power_saver_enabled;
-
-          if (!power_saver_enabled)
-          {
-            // when powered back on, default to idle screen
-            //and erase last displayed drone info
-            display.idle_update(drones_detected(millis(), ACTIVE_DRONE_TIMEFRAME), total_detected());
-            current_displayed_drone = nullptr;
-
+          // output all detected drones
+          for (int i = 0; i < MAX_UAVS; i++){
+            id_data* UAV = get_uav(i);
+            if (UAV->mac[0] == 0){
+                break; //end of the list
+            }
+            send_json_fast(UAV);
           }
+
           
-          break;
         }
       }
 
@@ -491,7 +486,7 @@ void initializeButtons(){
 
   attachInterrupt(1, buttonUpISR, RISING);
   attachInterrupt(2, buttonDownISR, RISING);
-  attachInterrupt(0, buttonPowerISR, FALLING);
+  attachInterrupt(0, buttonOtherISR, FALLING);
 }
 #endif
 

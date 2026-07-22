@@ -23,6 +23,9 @@ struct id_data {
 #define MAX_UAVS 32
 #define ACTIVE_DRONE_TIMEFRAME 7000
 
+//return UAV at index
+id_data* get_uav(uint8_t index);
+
 //either returns pointer to ID matching the mac, or the next empty spot in the list
 id_data* next_uav(uint8_t* mac);
 

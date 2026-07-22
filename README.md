@@ -8,6 +8,8 @@
 
 Sky-Spy is one of the official firmware options for the [OUI-SPY hardware platform](https://github.com/colonelpanichacks/OUI-SPY). This specialized firmware detects and tracks drones broadcasting RemoteID via WiFi and Bluetooth Low Energy, outputting real-time JSON data for visualization with mesh-mapper.py.
 
+> **NOTE** This repo has been forked and contains more alternative hardware options, read more below under "Compatible Development Boards" below and Features list for more info
+
 ## OUI-SPY Firmware Family
 
 Sky-Spy is part of the OUI-SPY firmware ecosystem:
@@ -51,6 +53,12 @@ The OUI-SPY board is a ready-to-use ESP32-S3 platform with:
   - ESP32-C6 RISC-V MCU
   - WiFi 6 & Bluetooth 5.3 (LE)
 
+- **Adafruit ESP32-S3 Reverse TFT Feather** (Alternative)
+  - ESP32-S3 Dual Core 240MHz Tensilica processor
+  - Color 1.14" IPS TFT with 240x135 display
+  - Three User Tactile buttons
+  - Power options - USB type C or Lipoly battery 
+
 ### Buzzer Connection
 - **Pin:** GPIO3 (D2) - PWM capable
 - **Type:** Passive buzzer (requires PWM signal)
@@ -83,6 +91,11 @@ The OUI-SPY board is a ready-to-use ESP32-S3 platform with:
   - **Core 0:** WiFi promiscuous mode packet processing
   - **Core 1:** BLE scanning, JSON output, buzzer control
 
+### Display Information and Interact with it (Adafruit reverse TFT feather only)
+  - **Idle Screen:** View Total and in-range drone count
+  - **Active Drones:** Use buttons to loop through in-range drones, viewing GPS and RSSI data
+  - **Output JSON data:** Use button to output all detected drone information via serial as JSON, allowing battery powered Adafruit TFT devices to plug into a computer and report all drone detections
+
 ## Installation
 
 ### Prerequisites
@@ -94,7 +107,7 @@ The OUI-SPY board is a ready-to-use ESP32-S3 platform with:
 
 1. **Clone or download this repository**
    ```bash
-   cd /path/to/remoteid-mesh-dualcore
+   cd /path/to/sky-spy
    ```
 
 2. **Install dependencies** (automatic via PlatformIO)
@@ -184,9 +197,9 @@ To disable audio alerts, comment out line 377 in `main.cpp`:
 ### Detection Methods
 
 **WiFi Promiscuous Mode:**
-- Listens on channel 6 (WiFi RemoteID standard channel)
+- Listens on channel 6 (2.4G WiFi RemoteID standard channel)
 - Captures beacon frames and probe requests
-- Parses OpenDroneID NAN action frames
+- Parses OpenDroneID NAN action frames and Beacon Frames
 - Extracts vendor-specific information elements
 
 **BLE Scanning:**
@@ -353,6 +366,7 @@ All OUI-SPY firmware shares the same thread-safe, non-blocking buzzer architectu
 - **ArduinoJson:** v6.21.5
 - **ESP-IDF:** v5.4
 - **BLE Libraries:** ESP32 BLE Arduino
+- **Adafruit TFT libraries:** For Adafruit TFT reverse feather only
 
 ### License
 This project is provided as-is for educational and research purposes. Inherits licensing from:

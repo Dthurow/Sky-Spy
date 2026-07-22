@@ -30,6 +30,13 @@ id_data uavs[MAX_UAVS] = {0};
 // };
 
 
+id_data* get_uav(uint8_t index){
+    if (index < MAX_UAVS){
+        return &uavs[index];
+    }
+    return nullptr;
+}
+
 id_data* next_uav(uint8_t* mac) {
   for (int i = 0; i < MAX_UAVS; i++) {
     if (memcmp(uavs[i].mac, mac, 6) == 0)
